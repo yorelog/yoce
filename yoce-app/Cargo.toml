@@ -1,0 +1,23 @@
+[package]
+name = "yoce-app"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = ["engine-webview2"]
+engine-webview2 = []
+engine-cef = []
+inspector = []
+
+[dependencies]
+gpui = "0.2"
+gpui-wry = "0.5.0"
+yoce-engine = { path = "../yoce-engine" }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+raw-window-handle = { version = "0.6", features = ["std"] }
+wry = "0.53.5"
+
+[[bin]]
+name = "yoce"
+path = "src/main.rs"
