@@ -1,21 +1,26 @@
 [package]
 name = "yoce-app"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [features]
-default = ["engine-webview2"]
-engine-webview2 = []
-engine-cef = []
+# Engine-specific features will be added when engine crates exist.
+# For now, shell uses wry directly.
+default = []
 inspector = []
 
 [dependencies]
-gpui = "0.2"
-gpui-wry = "0.5.0"
+gpui = { git = "https://github.com/zed-industries/zed" }
+gpui_platform = { git = "https://github.com/zed-industries/zed", features = ["font-kit"] }
+gpui-wry = { git = "https://github.com/longbridge/gpui-component" }
+gpui-component = { git = "https://github.com/longbridge/gpui-component" }
+gpui-component-assets = { git = "https://github.com/longbridge/gpui-component" }
 yoce-engine = { path = "../yoce-engine" }
 
 raw-window-handle = { version = "0.6", features = ["std"] }
-wry = "0.53.5"
+wry = "0.53"
+log = "0.4"
+env_logger = "0.11"
 
 [[bin]]
 name = "yoce"

@@ -1,89 +1,73 @@
-# Yoce Agent Browser - Coding Agent Playbook
+# Yoce — Coding Agent 速查
 
-> Source of truth: YOCE_CODING_AGENT_Version1.md
-> This file: short operational guide for day-to-day coding agent execution
+> 详细架构：`YOCE_CODING_AGENT_Version1.md`  
+> 本文是日常执行指南。
 
-## 1. Read Order
+## 1. 阅读顺序
 
-Before coding:
+1. 先看架构契约（`YOCE_CODING_AGENT_Version1.md`）
+2. 再看本文
+3. 检查当前阶段状态
 
-1. Read YOCE_CODING_AGENT_Version1.md
-2. Read this AGENTS.md
-3. Inspect current phase and current baseline files
+## 2. 项目定位
 
-If this file conflicts with the architecture spec, the architecture spec wins.
+**Yoce = AI Agent 浏览器。**
 
-## 2. Mission
+- 引擎：wry (WebView2 / WKWebView)  
+- Shell：gpui  
+- 共享契约：yoce-engine (ShellCommand + ShellEvent)
 
-Rebuild Yoce into a gpui-shell browser with pluggable engines.
+## 3. 快速校验
 
-Immediate focus:
+```bash
+cargo build -p yoce-app
+cargo clippy -p yoce-app -- -D warnings
+```
 
-- stable shell behavior in yoce-app
-- shared contracts in yoce-engine
-- no engine-specific leakage into shell orchestration
+## 4. 硬规则
 
-## 3. Fast Commands
+1. wry 唯一直连 yoce-app shell，不需要 engine trait 抽象层
+2. gpui 拥有事件循环
+3. 所有操作通过 `YoceShell::dispatch()` 路由
+4. Shell 和 agent 通过 `yoce_engine::ShellCommand` / `ShellEvent` 通信
+5. 每次改动后必须能编译，不积累跨阶段的改动
 
-Use narrow validation first:
+## 5. 当前架构
 
-- cargo build -p yoce-app
-- cargo test -p yoce-app
-- cargo clippy -p yoce-app -- -D warnings
+```
+yoce-app/src/
+├── main.rs
+├── agent/
+│   └── panel.rs             AgentPanel 骨架
+├── components/button.rs
+├── shell/
+│   ├── mod.rs               build_root, UnsupportedShell, 工具函数
+│   ├── yoce_shell.rs        YoceShell + dispatch() + Render
+│   ├── polling.rs           后台轮询
+│   └── keyboard.rs          键盘/地址栏事件
+└── state/
+    ├── tab_state.rs
+    └── nav_state.rs         跨线程共享状态
+```
 
-Engine checks:
+## 6. 当前阶段
 
-- cargo build -p yoce-app --features engine-webview2
-- cargo build -p yoce-app --features engine-cef
+| Phase | 状态 |
+|-------|------|
+| A — Shell 核心 | ✓ |
+| B — 模块化 | ✓ |
+| C — 统一命令层 | ✓ |
+| D — Agent Runtime | ← current |
 
-## 4. Hard Rules
+## 7. 实现模式
 
-1. Do not restore legacy architecture just because it existed.
-2. Keep gpui as the only shell owner in yoce-app.
-3. Keep yoce-app engine-agnostic through yoce-engine traits.
-4. Keep one shared shell command path for all engines.
-5. Keep changes phase-oriented and buildable after each slice.
+1. 选一个垂直切片
+2. 最小代码完成
+3. build + clippy 通过
+4. 架构变了就同步更新文档
 
-## 5. Current Working Baseline
+## 8. Done 标准
 
-Repository currently contains minimal crates:
-
-- yoce-app
-- yoce-engine
-
-Current implemented shell slice includes:
-
-- embedded webview demo path
-- address bar editing path
-- in-memory tab behavior path
-
-Treat this as a seed, not final architecture.
-
-## 6. Implementation Pattern
-
-For each task:
-
-1. pick one vertical slice
-2. implement minimal code to complete the slice
-3. validate with required build command
-4. update architecture spec if boundaries or phase plan changed
-
-Do not batch unrelated changes.
-
-## 7. What To Defer
-
-Do not expand these until browser core is stable:
-
-- extension host depth
-- RL environment depth
-- protocol completeness
-- broad agent orchestration features
-
-## 8. Done Criteria
-
-A change is done only if:
-
-1. affected build commands pass
-2. shell-engine isolation remains intact
-3. architecture spec is updated when architecture changed
-4. no regression in current shell baseline behavior
+1. build + clippy 通过
+2. 无退化
+3. 文档已更新

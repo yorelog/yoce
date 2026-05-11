@@ -1,19 +1,31 @@
-//! Shared browser engine contracts for Yoce rebuild.
+//! yoce-engine — Shared contracts between the gpui shell (yoce-app)
+//! and the AI agent runtime.
+//!
+//! This crate contains **pure data types only**:
+//! - `ShellCommand` — every action the shell can perform.
+//! - `ShellEvent` — events the shell emits (observed by agents).
+//! - Error types and shared identifiers.
+//!
+//! Zero runtime dependencies beyond `url`.
 
-use std::{error::Error, fmt, rc::Rc};
+use std::fmt;
 
 pub use url::Url;
 
-pub type EngineResult<T> = Result<T, EngineError>;
+// ---------------------------------------------------------------------------
+// Error types — shared across shell and agent
+// ---------------------------------------------------------------------------
+
+pub type ShellResult<T> = Result<T, ShellError>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum EngineError {
+pub enum ShellError {
     InvalidInput(String),
     Unsupported(String),
     Runtime(String),
 }
 
-impl fmt::Display for EngineError {
+impl fmt::Display for ShellError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidInput(msg) => write!(f, "invalid input: {msg}"),
@@ -23,11 +35,17 @@ impl fmt::Display for EngineError {
     }
 }
 
-impl Error for EngineError {}
+impl std::error::Error for ShellError {}
 
+// ---------------------------------------------------------------------------
+// Identifiers
+// ---------------------------------------------------------------------------
+
+/// Opaque identifier for a web view / tab.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct WebViewId(pub u64);
 
+/// Page load lifecycle status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LoadStatus {
     Idle,
@@ -36,43 +54,48 @@ pub enum LoadStatus {
     Failed,
 }
 
-#[derive(Debug, Clone)]
-pub enum EngineEvent {
-    TitleChanged {
-        id: WebViewId,
-        title: String,
-    },
-    UrlChanged {
-        id: WebViewId,
-        url: Url,
-    },
+// ---------------------------------------------------------------------------
+// Command layer — shared entry point for UI and agent
+// ---------------------------------------------------------------------------
+
+/// Every action the shell can perform.
+///
+/// Both the UI (button clicks, keyboard shortcuts) and the agent runtime
+/// route through this enum via `YoceShell::dispatch()`.
+#[derive(Clone, Debug)]
+pub enum ShellCommand {
+    // -- Navigation --
+    Navigate(String),
+    Reload,
+    Back,
+
+    // -- Tabs --
+    NewTab,
+    CloseActiveTab,
+    SwitchTab(u64),
+
+    // -- Address bar --
+    CommitAddress,
+    FocusAddress,
+    BlurAddress,
 }
 
-pub trait Engine {
-    fn name(&self) -> &'static str;
-}
+// ---------------------------------------------------------------------------
+// Event layer — observation surface for agents
+// ---------------------------------------------------------------------------
 
-pub trait BrowserEngine: Engine {
-    fn create_webview(&self, url: Url, hidpi_scale: f32) -> EngineResult<Rc<dyn WebViewHandle>>;
-    fn spin_event_loop(&self);
-    fn drain_events(&self) -> Vec<EngineEvent>;
-}
-
-pub trait WebViewHandle {
-    fn id(&self) -> WebViewId;
-    fn load(&self, url: Url) -> EngineResult<()>;
-    fn reload(&self) -> EngineResult<()>;
-    fn go_back(&self) -> EngineResult<()>;
-    fn go_forward(&self) -> EngineResult<()>;
-    fn url(&self) -> Option<Url>;
-    fn page_title(&self) -> Option<String>;
-    fn load_status(&self) -> LoadStatus;
-    fn can_go_back(&self) -> bool;
-    fn can_go_forward(&self) -> bool;
-    fn resize(&self, width: u32, height: u32) -> EngineResult<()>;
-    fn set_bounds(&self, x: i32, y: i32, width: u32, height: u32) -> EngineResult<()>;
-    fn show(&self) -> EngineResult<()>;
-    fn hide(&self) -> EngineResult<()>;
-    fn focus(&self) -> EngineResult<()>;
-    fn blur(&self) -> EngineResult<()>;
+/// Events the shell emits after executing a command.
+///
+/// Agents observe these events to track tab state, navigation, and UI changes.
+#[derive(Clone, Debug)]
+pub enum ShellEvent {
+    TabCreated { id: u64, url: String },
+    TabClosed { id: u64 },
+    TabSwitched { id: u64 },
+    Navigated { url: String },
+    Reloaded,
+    BackNavigated { result: Result<(), String> },
+    AddressFocused,
+    AddressBlurred,
+    StatusChanged(String),
 }
