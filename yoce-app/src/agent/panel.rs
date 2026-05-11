@@ -141,8 +141,8 @@ impl Render for AgentPanel {
                     .child(
                         div()
                             .id(SharedString::from("agent-input"))
-                            .on_click(cx.listener(|this, _evt, window, _cx| {
-                                window.focus(&this.focus_handle);
+                            .on_click(cx.listener(|this, _evt, window, cx| {
+                                window.focus(&this.focus_handle, cx);
                             }))
                             .h(px(28.0)).flex_1().px_2().items_center().text_sm()
                             .bg(rgb(0x101927)).border_1().border_color(rgb(0x31506d))

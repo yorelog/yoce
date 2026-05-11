@@ -3,7 +3,7 @@ mod components;
 mod shell;
 mod state;
 
-use gpui::{px, App, Bounds, Pixels, Size, WindowBounds, WindowOptions};
+use gpui::{px, App, AppContext, Bounds, Pixels, Size, WindowBounds, WindowOptions};
 
 fn main() {
     env_logger::Builder::from_env(
@@ -11,11 +11,6 @@ fn main() {
     )
     .init();
 
-    #[cfg(target_os = "windows")]
-    {
-        // Required by gpui + child webview composition on Windows.
-        std::env::set_var("GPUI_DISABLE_DIRECT_COMPOSITION", "true");
-    }
 
     gpui_platform::application()
         .with_assets(gpui_component_assets::Assets)

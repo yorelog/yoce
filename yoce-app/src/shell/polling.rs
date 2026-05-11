@@ -13,9 +13,8 @@ use super::yoce_shell::YoceShell;
 /// executing deferred callbacks.  Calling `e.update(cx, ...)` inside the
 /// callback tried to acquire a second mutable borrow.
 ///
-/// `sync_nav_state()` is called at the top of `render()` instead, and it
-/// calls `cx.notify()` when there are pending updates, which keeps the UI
-/// in sync on every render cycle.
+/// `sync_nav_state()` is called at the top of `render()` instead and only
+/// applies pending URL/title data without triggering nested notifications.
 #[allow(dead_code)]
 pub fn poll_nav_state(
     _entity: WeakEntity<YoceShell>,

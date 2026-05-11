@@ -16,7 +16,7 @@ use yoce_engine::{ShellCommand, ShellEvent};
 
 pub struct YoceShell {
     pub focus_handle: FocusHandle,
-    pub webview: Entity<WebView>,
+    pub webview: Option<Entity<WebView>>,
     pub tabs: Vec<TabState>,
     pub active_tab_index: usize,
     pub next_tab_id: u64,
@@ -39,55 +39,7 @@ impl YoceShell {
             pending_title: None,
         }));
 
-        let webview = cx.new(|cx| {
-            let nav_for_url = nav_state.clone();
-            let nav_for_title = nav_state.clone();
-
-            const NEW_WINDOW_JS: &str = r#"
-(function() {
-    document.addEventListener('click', function(e) {
-        var link = e.target.closest('a');
-        if (link && link.target === '_blank') {
-            e.preventDefault();
-            window.location.href = link.href;
-        }
-    }, true);
-    var _origOpen = window.open;
-    window.open = function(url) {
-        window.location.href = url;
-        return window;
-    };
-})();
-"#;
-
-            let builder = wry::WebViewBuilder::new()
-                .with_initialization_script(NEW_WINDOW_JS)
-                .with_new_window_req_handler(|_url, _features| wry::NewWindowResponse::Deny)
-                .with_on_page_load_handler(move |event, url| {
-                    if matches!(event, wry::PageLoadEvent::Finished) {
-                        if let Ok(mut s) = nav_for_url.lock() {
-                            s.pending_url = Some(url);
-                        }
-                    }
-                })
-                .with_document_title_changed_handler(move |title| {
-                    if let Ok(mut s) = nav_for_title.lock() {
-                        s.pending_title = Some(title);
-                    }
-                });
-            #[cfg(any(debug_assertions, feature = "inspector"))]
-            let builder = builder.with_devtools(true);
-
-            let window_handle = window.window_handle().expect("window handle");
-            let raw = builder
-                .build_as_child(&window_handle)
-                .expect("create child webview");
-
-            WebView::new(raw, window, cx)
-        });
-
         let initial_url = "https://example.com".to_string();
-        webview.update(cx, |view, _| view.load_url(&initial_url));
 
         let agent_store = crate::agent::store::AgentStore::create(cx);
         let agent_panel = crate::agent::AgentPanel::new(agent_store.clone(), cx);
@@ -100,7 +52,7 @@ impl YoceShell {
 
         let shell = cx.new(|cx| Self {
             focus_handle: cx.focus_handle(),
-            webview,
+            webview: None,
             agent_panel,
             agent_store,
             log_store,
@@ -120,12 +72,14 @@ impl YoceShell {
             nav_state: nav_state.clone(),
         });
 
+        let _ = (window, nav_state.clone(), initial_url.clone());
+
         poll_nav_state(shell.downgrade(), nav_state.clone(), cx);
 
         shell
     }
 
-    pub fn sync_nav_state(&mut self, cx: &mut Context<Self>) {
+    pub fn sync_nav_state(&mut self) {
         let (pending_url, pending_title) = {
             let mut nav = self.nav_state.lock().unwrap();
             (nav.pending_url.take(), nav.pending_title.take())
@@ -148,7 +102,6 @@ impl YoceShell {
 
         if changed {
             self.sync_address_from_active_tab();
-            cx.notify();
         }
     }
 
@@ -173,8 +126,11 @@ impl YoceShell {
     pub fn navigate(&mut self, url: &str, cx: &mut Context<Self>) {
         let normalized = crate::shell::normalize_url_input(url);
         self.status = format!("Navigate: {normalized}");
-        self.webview
-            .update(cx, |view, _| view.load_url(&normalized));
+        if let Some(webview) = &self.webview {
+            webview.update(cx, |view, _| view.load_url(&normalized));
+        } else {
+            self.status = "WebView is still initializing".to_string();
+        }
         if let Some(tab) = self.active_tab_mut() {
             tab.url = normalized.clone();
             tab.title = crate::shell::title_from_url(&normalized);
@@ -191,9 +147,11 @@ impl YoceShell {
     }
 
     pub fn reload(&mut self, cx: &mut Context<Self>) {
-        let result = self
-            .webview
-            .update(cx, |view, _| view.evaluate_script("location.reload();"));
+        let Some(webview) = &self.webview else {
+            self.status = "WebView is still initializing".to_string();
+            return;
+        };
+        let result = webview.update(cx, |view, _| view.evaluate_script("location.reload();"));
         self.status = match result {
             Ok(()) => "Reload".to_string(),
             Err(err) => format!("Reload failed: {err}"),
@@ -215,7 +173,11 @@ impl YoceShell {
                 ShellEvent::Reloaded
             }
             ShellCommand::Back => {
-                let result = self.webview.update(cx, |view, _| view.back());
+                let Some(webview) = &self.webview else {
+                    self.status = "WebView is still initializing".to_string();
+                    return None;
+                };
+                let result = webview.update(cx, |view, _| view.back());
                 self.status = match result {
                     Ok(()) => "Back".to_string(),
                     Err(ref err) => format!("Back failed: {err}"),
@@ -321,7 +283,7 @@ impl Focusable for YoceShell {
 
 impl Render for YoceShell {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        self.sync_nav_state(cx);
+        self.sync_nav_state();
 
         let toolbar = div()
             .h(px(48.0))
@@ -515,7 +477,19 @@ impl Render for YoceShell {
                         .border_1()
                         .border_color(rgb(0x2a3f58))
                         .rounded_sm()
-                        .child(self.webview.clone()),
+                        .child(if let Some(webview) = &self.webview {
+                            webview.clone().into_any_element()
+                        } else {
+                            div()
+                                .size_full()
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .text_sm()
+                                .text_color(rgb(0x9fb2c9))
+                                .child("Initializing webview...")
+                                .into_any_element()
+                        }),
                 );
                 if self.agent_visible {
                     div()

@@ -18,7 +18,7 @@ gpui-component-assets = { git = "https://github.com/longbridge/gpui-component" }
 yoce-engine = { path = "../yoce-engine" }
 
 raw-window-handle = { version = "0.6", features = ["std"] }
-wry = "0.53"
+wry = { version = "0.53.3", package = "lb-wry" }
 log = "0.4"
 env_logger = "0.11"
 

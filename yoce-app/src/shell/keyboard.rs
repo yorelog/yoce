@@ -190,7 +190,7 @@ impl YoceShell {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        window.focus(&self.focus_handle);
+        window.focus(&self.focus_handle, cx);
         self.address_focused = true;
         self.address_cursor = self.address_input.len();
         self.address_selection = None;
