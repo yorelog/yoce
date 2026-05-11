@@ -1,26 +1,23 @@
 use gpui::{
-    App, ClickEvent, Context, Entity, FocusHandle, Focusable, IntoElement, KeyDownEvent, Render,
-    SharedString, Styled, Window, div, prelude::*, px, rgb,
+    div, prelude::*, px, rgb, App, ClickEvent, Context, Entity, FocusHandle, Focusable,
+    IntoElement, KeyDownEvent, Render, SharedString, Styled, Window,
 };
 
-#[cfg(target_os = "windows")]
 use gpui_wry::WebView;
-#[cfg(target_os = "windows")]
 use raw_window_handle::HasWindowHandle;
 
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", target_os = "macos"))]
 pub fn build_root(window: &mut Window, cx: &mut App) -> Entity<YoceShell> {
     YoceShell::new(window, cx)
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 pub fn build_root(_: &mut Window, cx: &mut App) -> Entity<UnsupportedShell> {
     cx.new(|cx| UnsupportedShell {
         focus_handle: cx.focus_handle(),
     })
 }
 
-#[cfg(target_os = "windows")]
 #[derive(Clone)]
 struct TabState {
     id: u64,
@@ -28,7 +25,6 @@ struct TabState {
     url: String,
 }
 
-#[cfg(target_os = "windows")]
 pub struct YoceShell {
     focus_handle: FocusHandle,
     webview: Entity<WebView>,
@@ -42,7 +38,6 @@ pub struct YoceShell {
     status: String,
 }
 
-#[cfg(target_os = "windows")]
 impl YoceShell {
     pub fn new(window: &mut Window, cx: &mut App) -> Entity<Self> {
         let webview = cx.new(|cx| {
@@ -75,7 +70,7 @@ impl YoceShell {
             address_cursor: initial_url.len(),
             address_selection: None,
             address_focused: false,
-            status: "WebView2 demo running in-app".to_string(),
+            status: "Yoce Browser demo running in-app".to_string(),
         })
     }
 
@@ -101,7 +96,8 @@ impl YoceShell {
     fn navigate(&mut self, url: &str, cx: &mut Context<Self>) {
         let normalized = normalize_url_input(url);
         self.status = format!("Navigate: {normalized}");
-        self.webview.update(cx, |view, _| view.load_url(&normalized));
+        self.webview
+            .update(cx, |view, _| view.load_url(&normalized));
 
         if let Some(tab) = self.active_tab_mut() {
             tab.url = normalized.clone();
@@ -176,7 +172,9 @@ impl YoceShell {
     }
 
     fn reload(&mut self, cx: &mut Context<Self>) {
-        let result = self.webview.update(cx, |view, _| view.evaluate_script("location.reload();"));
+        let result = self
+            .webview
+            .update(cx, |view, _| view.evaluate_script("location.reload();"));
         self.status = match result {
             Ok(()) => "Reload".to_string(),
             Err(err) => format!("Reload failed: {err}"),
@@ -339,7 +337,8 @@ impl YoceShell {
             );
             if !deleted && self.address_cursor > 0 {
                 let prev = prev_char_boundary(&self.address_input, self.address_cursor);
-                self.address_input.replace_range(prev..self.address_cursor, "");
+                self.address_input
+                    .replace_range(prev..self.address_cursor, "");
                 self.address_cursor = prev;
             }
             cx.notify();
@@ -354,7 +353,8 @@ impl YoceShell {
             );
             if !deleted && self.address_cursor < self.address_input.len() {
                 let next = next_char_boundary(&self.address_input, self.address_cursor);
-                self.address_input.replace_range(self.address_cursor..next, "");
+                self.address_input
+                    .replace_range(self.address_cursor..next, "");
             }
             cx.notify();
             return;
@@ -406,14 +406,12 @@ impl YoceShell {
     }
 }
 
-#[cfg(target_os = "windows")]
 impl Focusable for YoceShell {
     fn focus_handle(&self, _cx: &App) -> FocusHandle {
         self.focus_handle.clone()
     }
 }
 
-#[cfg(target_os = "windows")]
 impl Render for YoceShell {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let toolbar = div()
@@ -426,34 +424,55 @@ impl Render for YoceShell {
             .bg(rgb(0x132030))
             .border_b_1()
             .border_color(rgb(0x203247))
-            .child(button("Back", cx.listener(|this, _evt: &ClickEvent, _window, cx| {
-                this.back(cx);
-                cx.notify();
-            })))
-            .child(button("Reload", cx.listener(|this, _evt: &ClickEvent, _window, cx| {
-                this.reload(cx);
-                cx.notify();
-            })))
-            .child(button("New Tab", cx.listener(|this, _evt: &ClickEvent, _window, cx| {
-                this.new_tab(cx);
-                cx.notify();
-            })))
-            .child(button("Close Tab", cx.listener(|this, _evt: &ClickEvent, _window, cx| {
-                this.close_active_tab(cx);
-                cx.notify();
-            })))
-            .child(button("GPUI Docs", cx.listener(|this, _evt: &ClickEvent, _window, cx| {
-                this.open_docs(cx);
-                cx.notify();
-            })))
-            .child(button("GitHub", cx.listener(|this, _evt: &ClickEvent, _window, cx| {
-                this.open_github(cx);
-                cx.notify();
-            })))
-            .child(button("Example", cx.listener(|this, _evt: &ClickEvent, _window, cx| {
-                this.open_example(cx);
-                cx.notify();
-            })))
+            .child(button(
+                "Back",
+                cx.listener(|this, _evt: &ClickEvent, _window, cx| {
+                    this.back(cx);
+                    cx.notify();
+                }),
+            ))
+            .child(button(
+                "Reload",
+                cx.listener(|this, _evt: &ClickEvent, _window, cx| {
+                    this.reload(cx);
+                    cx.notify();
+                }),
+            ))
+            .child(button(
+                "New Tab",
+                cx.listener(|this, _evt: &ClickEvent, _window, cx| {
+                    this.new_tab(cx);
+                    cx.notify();
+                }),
+            ))
+            .child(button(
+                "Close Tab",
+                cx.listener(|this, _evt: &ClickEvent, _window, cx| {
+                    this.close_active_tab(cx);
+                    cx.notify();
+                }),
+            ))
+            .child(button(
+                "GPUI Docs",
+                cx.listener(|this, _evt: &ClickEvent, _window, cx| {
+                    this.open_docs(cx);
+                    cx.notify();
+                }),
+            ))
+            .child(button(
+                "GitHub",
+                cx.listener(|this, _evt: &ClickEvent, _window, cx| {
+                    this.open_github(cx);
+                    cx.notify();
+                }),
+            ))
+            .child(button(
+                "Example",
+                cx.listener(|this, _evt: &ClickEvent, _window, cx| {
+                    this.open_example(cx);
+                    cx.notify();
+                }),
+            ))
             .child(
                 div()
                     .ml_3()
@@ -462,11 +481,24 @@ impl Render for YoceShell {
                     .child("Ctrl+L/T/W/R and Ctrl+A/C/X/V in address"),
             );
 
-        let tab_strip = div().h(px(40.0)).w_full().px_3().flex().items_center().gap_2().bg(rgb(0x0f1926)).border_b_1().border_color(rgb(0x203247)).children(
-            self.tabs.iter().enumerate().map(|(index, tab)| {
+        let tab_strip = div()
+            .h(px(40.0))
+            .w_full()
+            .px_3()
+            .flex()
+            .items_center()
+            .gap_2()
+            .bg(rgb(0x0f1926))
+            .border_b_1()
+            .border_color(rgb(0x203247))
+            .children(self.tabs.iter().enumerate().map(|(index, tab)| {
                 let tab_id = tab.id;
                 let is_active = index == self.active_tab_index;
-                let bg_color = if is_active { rgb(0x2a4461) } else { rgb(0x1a2c40) };
+                let bg_color = if is_active {
+                    rgb(0x2a4461)
+                } else {
+                    rgb(0x1a2c40)
+                };
                 let label = format!("{} {}", tab.id, tab.title);
                 div()
                     .id(SharedString::from(format!("tab-{}", tab.id)))
@@ -484,8 +516,7 @@ impl Render for YoceShell {
                         this.switch_tab(tab_id, cx);
                         cx.notify();
                     }))
-            }),
-        );
+            }));
 
         let address_bar = div()
             .h(px(44.0))
@@ -515,10 +546,13 @@ impl Render for YoceShell {
                         this.on_address_click(evt, window, cx);
                     })),
             )
-            .child(button("Go", cx.listener(|this, _evt: &ClickEvent, _window, cx| {
-                this.commit_address_navigation(cx);
-                cx.notify();
-            })));
+            .child(button(
+                "Go",
+                cx.listener(|this, _evt: &ClickEvent, _window, cx| {
+                    this.commit_address_navigation(cx);
+                    cx.notify();
+                }),
+            ));
 
         let status = div()
             .h(px(30.0))
@@ -549,18 +583,14 @@ impl Render for YoceShell {
             .child(address_bar)
             .child(status)
             .child(
-                div()
-                    .flex_1()
-                    .w_full()
-                    .p_3()
-                    .child(
-                        div()
-                            .size_full()
-                            .border_1()
-                            .border_color(rgb(0x2a3f58))
-                            .rounded_sm()
-                            .child(self.webview.clone()),
-                    ),
+                div().flex_1().w_full().p_3().child(
+                    div()
+                        .size_full()
+                        .border_1()
+                        .border_color(rgb(0x2a3f58))
+                        .rounded_sm()
+                        .child(self.webview.clone()),
+                ),
             )
     }
 }
@@ -571,11 +601,7 @@ fn title_from_url(url: &str) -> String {
         .strip_prefix("https://")
         .or_else(|| trimmed.strip_prefix("http://"))
         .unwrap_or(trimmed);
-    no_scheme
-        .split('/')
-        .next()
-        .unwrap_or("Tab")
-        .to_string()
+    no_scheme.split('/').next().unwrap_or("Tab").to_string()
 }
 
 fn normalize_url_input(input: &str) -> String {
@@ -681,19 +707,19 @@ fn button(
         .on_click(on_click)
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 pub struct UnsupportedShell {
     focus_handle: FocusHandle,
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 impl Focusable for UnsupportedShell {
     fn focus_handle(&self, _cx: &App) -> FocusHandle {
         self.focus_handle.clone()
     }
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 impl Render for UnsupportedShell {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
         div()
@@ -701,6 +727,6 @@ impl Render for UnsupportedShell {
             .flex()
             .items_center()
             .justify_center()
-            .child("Yoce demo currently supports embedded webview on Windows.")
+            .child("Yoce currently supports Windows and macOS.")
     }
 }

@@ -1,8 +1,6 @@
 mod shell;
 
-use gpui::{
-    App, Application, Bounds, Pixels, Size, WindowBounds, WindowOptions, px,
-};
+use gpui::{px, App, Application, Bounds, Pixels, Size, WindowBounds, WindowOptions};
 
 fn main() {
     #[cfg(target_os = "windows")]
@@ -24,7 +22,7 @@ fn main() {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 ..Default::default()
             },
-            |window, cx| shell::build_root(window, cx),
+            shell::build_root,
         )
         .expect("open yoce window");
 

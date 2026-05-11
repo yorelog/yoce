@@ -14,7 +14,6 @@ gpui = "0.2"
 gpui-wry = "0.5.0"
 yoce-engine = { path = "../yoce-engine" }
 
-[target.'cfg(target_os = "windows")'.dependencies]
 raw-window-handle = { version = "0.6", features = ["std"] }
 wry = "0.53.5"
 
